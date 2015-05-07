@@ -47,6 +47,10 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\FakeItEasy.1.25.2\lib\net40\FakeItEasy.dll</HintPath>
     </Reference>
+<Reference Include="AWSSDK, Version=2.3.34.1, Culture=neutral, PublicKeyToken=9f476d3089b52be3, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\AWSSDK.2.3.34.1\lib\net45\AWSSDK.dll</HintPath>
+    </Reference>
     <Reference Include="FluentAssertions, Version=3.4.1.0, Culture=neutral, PublicKeyToken=33f2691a05b67b6a, processorArchitecture=MSIL">
       <HintPath>..\packages\FluentAssertions.3.4.1\lib\net45\FluentAssertions.dll</HintPath>
       <Private>True</Private>
@@ -182,7 +186,6 @@
     <Compile Include="MessageDispatch\TestDoubles\SpyCommandProcessor.cs" />
     <Compile Include="MessageStore\EventStore\EventStoreMessageStoreTests.cs" />
     <Compile Include="MessageStore\MsSql\SqlMessageStoreTests.cs" />
-    <Compile Include="MessageStore\MsSql\SqlMessageStoreMigrationTests.cs" />
     <Compile Include="MessagingGateway\MessageChannelTests.cs" />
     <Compile Include="MessagingGateway\restms\RestMSMessagingGatewayTests.cs" />
     <Compile Include="MessagingGateway\restms\RestMSParserTests.cs" />
@@ -208,6 +211,14 @@
       <Project>{C1FC780B-4BAD-47AE-9A0D-FE216239AFD8}</Project>
       <Name>paramore.brighter.commandprocessor.messagestore.mssql</Name>
     </ProjectReference>
+    <ProjectReference Include="..\paramore.brighter.commandprocessor.messagestore.ravendb\paramore.brighter.commandprocessor.messagestore.ravendb.csproj">
+      <Project>{224f828a-1abf-4d7b-8c48-66856bfd1ded}</Project>
+      <Name>paramore.brighter.commandprocessor.messagestore.ravendb</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\paramore.brighter.commandprocessor.messaginggateway.awssqs\paramore.brighter.commandprocessor.messaginggateway.awssqs.csproj">
+      <Project>{bd921f35-47c9-41ba-b1bc-ae9698869977}</Project>
+      <Name>paramore.brighter.commandprocessor.messaginggateway.awssqs</Name>
+    </ProjectReference>
     <ProjectReference Include="..\paramore.brighter.commandprocessor.messaginggateway.restms\paramore.brighter.commandprocessor.messaginggateway.restms.csproj">
       <Project>{c8bc2471-9d5c-4e94-81c8-036506f4ec34}</Project>
       <Name>paramore.brighter.commandprocessor.messaginggateway.restms</Name>
@@ -231,6 +242,7 @@
     </None>
     <None Include="app.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
     </None>
     <None Include="packages.config" />
   </ItemGroup>
