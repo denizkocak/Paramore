@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 
 using Machine.Specifications;
 
@@ -127,5 +128,151 @@ namespace paramore.commandprocessor.tests.MessagingGateway.awssqs
         private static Message receivedMessage;
     }
 
+    public class when_rejecting_a_message_through_gateway_with_requeue
+    {
+        Establish context = () =>
+        {
+            var logger = LogProvider.For<RmqMessageConsumer>();
 
+            var messageHeader = new MessageHeader(Guid.NewGuid(), "test2", MessageType.MT_COMMAND);
+
+            messageHeader.UpdateHandledCount();
+            message = new Message(header: messageHeader, body: new MessageBody("test content"));
+
+            sender = new SqsMessageProducer(queueUrl, logger);
+            receiver = new SqsMessageConsumer(queueUrl, logger);
+            testQueueListener = new TestAWSQueueListener(queueUrl);
+
+
+            var task = sender.Send(message);
+
+            task.ContinueWith(x => { if (x.IsCompleted)_listenedMessage = receiver.Receive(1000);
+                }).Wait();
+        };
+
+        Because i_reject_the_message = () => receiver.Reject(_listenedMessage, true);
+
+        private It should_requeue_the_message = () =>
+        {
+            var message = receiver.Receive(1000);
+            message.ShouldEqual(_listenedMessage);
+        };
+
+        Cleanup the_queue = () => testQueueListener.Purge(queueUrl);
+
+        private static TestAWSQueueListener testQueueListener;
+        private static string queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/brighter-test-queue";
+        private static IAmAMessageProducer sender;
+        private static IAmAMessageConsumer receiver;
+        private static Message message;
+        private static Message receivedMessage;
+        private static Message _listenedMessage;
+    }
+
+    public class when_rejecting_a_message_through_gateway_without_requeue
+    {
+        Establish context = () =>
+        {
+            var logger = LogProvider.For<RmqMessageConsumer>();
+
+            var messageHeader = new MessageHeader(Guid.NewGuid(), "test2", MessageType.MT_COMMAND);
+
+            messageHeader.UpdateHandledCount();
+            message = new Message(header: messageHeader, body: new MessageBody("test content"));
+
+            sender = new SqsMessageProducer(queueUrl, logger);
+            receiver = new SqsMessageConsumer(queueUrl, logger);
+            testQueueListener = new TestAWSQueueListener(queueUrl);
+
+
+            var task = sender.Send(message);
+
+            task.ContinueWith(x => { if (x.IsCompleted)_listenedMessage = receiver.Receive(1000);
+                }).Wait();
+        };
+
+        Because i_reject_the_message = () => receiver.Reject(_listenedMessage, false);
+
+        private It should_not_requeue_the_message = () =>
+        {
+            testQueueListener.Listen().ShouldBeNull();
+        };
+
+        Cleanup the_queue = () => testQueueListener.Purge(queueUrl);
+
+        private static TestAWSQueueListener testQueueListener;
+        private static string queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/brighter-test-queue";
+        private static IAmAMessageProducer sender;
+        private static IAmAMessageConsumer receiver;
+        private static Message message;
+        private static Message receivedMessage;
+        private static Message _listenedMessage;
+    }
+
+    public class when_purging_the_queue
+    {
+        private Establish context = () =>
+        {
+            var logger = LogProvider.For<RmqMessageConsumer>();
+
+            var messageHeader = new MessageHeader(Guid.NewGuid(), "test2", MessageType.MT_COMMAND);
+
+            messageHeader.UpdateHandledCount();
+            sentMessage = new Message(header: messageHeader, body: new MessageBody("test content"));
+
+            sender = new SqsMessageProducer(queueUrl, logger);
+            receiver = new SqsMessageConsumer(queueUrl, logger);
+            testQueueListener = new TestAWSQueueListener(queueUrl);
+        };
+
+        Because of = () => sender.Send(sentMessage).ContinueWith(
+            x => receiver.Purge()).Wait();
+
+        It should_clean_the_queue = () => testQueueListener.Listen().ShouldBeNull();
+
+        Cleanup the_queue = () => testQueueListener.Purge(queueUrl);
+        
+        private static TestAWSQueueListener testQueueListener;
+        private static IAmAMessageProducer sender;
+        private static string queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/brighter-test-queue"; 
+        private static IAmAMessageConsumer receiver;
+        private static Message sentMessage;
+    }
+
+    public class when_requeueing_a_message
+    {
+        private Establish context = () =>
+        {
+            var logger = LogProvider.For<RmqMessageConsumer>();
+
+            var messageHeader = new MessageHeader(Guid.NewGuid(), "test2", MessageType.MT_COMMAND);
+
+            messageHeader.UpdateHandledCount();
+            sentMessage = new Message(header: messageHeader, body: new MessageBody("test content"));
+
+            sender = new SqsMessageProducer(queueUrl, logger);
+            receiver = new SqsMessageConsumer(queueUrl, logger);
+            testQueueListener = new TestAWSQueueListener(queueUrl);
+        };
+
+        Because of = () => sender.Send(sentMessage).ContinueWith(
+            x =>
+            {
+                receivedMessage = receiver.Receive(2000);
+                receiver.Requeue(receivedMessage);
+            }).Wait();
+
+        It should_delete_the_original_message_and_create_new_message = () => {
+            var message = receiver.Receive(1000);
+            message.Body.Value.ShouldEqual(receivedMessage.Body.Value);
+            message.Header.Bag["ReceiptHandle"].ToString().ShouldNotEqual(receivedMessage.Header.Bag["ReceiptHandle"].ToString());
+        };
+
+        private static TestAWSQueueListener testQueueListener;
+        private static IAmAMessageProducer sender;
+        private static string queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/brighter-test-queue";
+        private static IAmAMessageConsumer receiver;
+        private static Message sentMessage;
+        private static Message receivedMessage;
+    }
 }

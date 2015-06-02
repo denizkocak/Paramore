@@ -91,7 +91,34 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
 
         public void Reject(Message message, bool requeue)
         {
-            throw new System.NotImplementedException();
+            if (!message.Header.Bag.ContainsKey("ReceiptHandle"))
+                return;
+
+            var receiptHandle = message.Header.Bag["ReceiptHandle"].ToString();
+
+            try
+            {
+                _logger.InfoFormat("SqsMessageConsumer: Rejecting the message {0} with receipt handle {1} on the queue {2} with requeue paramter {3}", message.Id, receiptHandle, _queueUrl, requeue);
+                
+                using (var client = new AmazonSQSClient())
+                {
+                    if (requeue)
+                    {
+                        client.ChangeMessageVisibility(new ChangeMessageVisibilityRequest(_queueUrl, receiptHandle, 0));
+                    }
+                    else
+                    {
+                        client.DeleteMessage(_queueUrl, receiptHandle);
+                    }
+                }
+
+                _logger.InfoFormat("SqsMessageConsumer: Message {0} with receipt handle {1} on the queue {2} with requeue paramter {3} has been rejected", message.Id, receiptHandle, _queueUrl, requeue);
+            }
+            catch (Exception exception)
+            {
+                _logger.ErrorException("SqsMessageConsumer: Error during rejecting the message {0} with receipt handle {1} on the queue {2}", exception, message.Id, receiptHandle, _queueUrl);
+                throw;
+            }
         }
 
         public void Purge()
@@ -100,6 +127,8 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
             {
                 using (var client = new AmazonSQSClient())
                 {
+                    _logger.InfoFormat("SqsMessageConsumer: Purging the queue {0}", _queueUrl);
+
                     client.PurgeQueue(_queueUrl);
 
                     _logger.InfoFormat("SqsMessageConsumer: Purged the queue {0}", _queueUrl);
@@ -114,12 +143,29 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
 
         public void Requeue(Message message)
         {
-            throw new System.NotImplementedException();
+            try
+            {
+                using (var client = new AmazonSQSClient())
+                {
+                    _logger.InfoFormat("SqsMessageConsumer: requeueing the message {0}", message.Id);
+
+                    client.SendMessage(_queueUrl, message.Body.Value);
+                }
+
+                Reject(message, false);
+
+                _logger.InfoFormat("SqsMessageConsumer: requeued the message {0}", message.Id);
+            }
+            catch (Exception exception)
+            {
+                _logger.ErrorException("SqsMessageConsumer: Error purging queue {0}", exception, _queueUrl);
+                throw;
+            }
         }
 
         public void Dispose()
         {
-            throw new System.NotImplementedException();
+            
         }
     }
 }
