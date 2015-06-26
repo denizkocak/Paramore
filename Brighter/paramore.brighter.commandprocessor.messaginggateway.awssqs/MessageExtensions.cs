@@ -29,8 +29,8 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
         public static Message ToMessage(this Amazon.SQS.Model.Message responseMessage)
         {
             var topic = responseMessage.MessageAttributes.ContainsKey(SqsMessageAttributes.TOPIC) ? responseMessage.MessageAttributes[SqsMessageAttributes.TOPIC].StringValue : string.Empty;
-            var messageId = responseMessage.MessageAttributes.ContainsKey(SqsMessageAttributes.MESSAGE_ID) ? Guid.Parse(responseMessage.MessageAttributes[SqsMessageAttributes.MESSAGE_ID].StringValue) : Guid.Empty;
-            var messageType = responseMessage.MessageAttributes.ContainsKey(SqsMessageAttributes.MESSAGE_TYPE) ? (MessageType)Enum.Parse(typeof(MessageType), responseMessage.MessageAttributes[SqsMessageAttributes.MESSAGE_TYPE].StringValue) : MessageType.MT_NONE;
+            var messageId = new Guid(responseMessage.MessageId);
+            var messageType = responseMessage.MessageAttributes.ContainsKey(SqsMessageAttributes.MESSAGE_TYPE) ? (MessageType)Enum.Parse(typeof(MessageType), responseMessage.MessageAttributes[SqsMessageAttributes.MESSAGE_TYPE].StringValue) : MessageType.MT_EVENT;
             var handledCount = responseMessage.MessageAttributes.ContainsKey(SqsMessageAttributes.HANDLED_COUNT) ? int.Parse(responseMessage.MessageAttributes[SqsMessageAttributes.HANDLED_COUNT].StringValue) : 0;
             var timeStamp = responseMessage.MessageAttributes.ContainsKey(SqsMessageAttributes.TIMESTAMP) ? UnixTimestamp.DateTimeFromUnixTimestampSeconds(long.Parse(responseMessage.MessageAttributes[SqsMessageAttributes.TIMESTAMP].StringValue)) : DateTime.UtcNow;
             var receiptHandle = responseMessage.ReceiptHandle;
