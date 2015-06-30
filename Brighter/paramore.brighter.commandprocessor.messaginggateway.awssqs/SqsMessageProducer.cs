@@ -1,5 +1,8 @@
-﻿using System.Threading.Tasks;
+﻿using System.Net;
+using System.Threading.Tasks;
 
+using Amazon.SimpleNotificationService;
+using Amazon.SimpleNotificationService.Model;
 using Amazon.SQS;
 using Amazon.SQS.Model;
 
@@ -12,26 +15,35 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
     public class SqsMessageProducer : IAmAMessageProducer
     {
         private readonly ILog _logger;
-        private readonly string _queueUrl;
 
-        public SqsMessageProducer(string queueUrl, ILog logger)
+        public SqsMessageProducer(ILog logger)
         {
             _logger = logger;
-            _queueUrl = queueUrl;
         }
 
         public Task Send(Message message)
         {
-            _logger.DebugFormat("SQSMessageProducer: Publishing message to queue {0} with topic {1} and id {2} and message: {3}", _queueUrl, message.Header.Topic, message.Id, JsonConvert.SerializeObject(message));
-
-            var messageAttributes = message.GenerateSqsMessageAttributes();
-
-            var sendMessageRequest = new SendMessageRequest { MessageBody = message.Body.Value, QueueUrl = _queueUrl, MessageAttributes = messageAttributes };
-
-            using (var client = new AmazonSQSClient())
+            var messageString = JsonConvert.SerializeObject(message);
+            _logger.DebugFormat("SQSMessageProducer: Publishing message with topic {0} and id {1} and message: {2}", message.Header.Topic, message.Id, messageString);
+            
+            using (var client = new AmazonSimpleNotificationServiceClient())
             {
-                return client.SendMessageAsync(sendMessageRequest);                
+                var topicArn = EnsureTopic(message.Header.Topic, client);
+
+                var publishRequest = new PublishRequest(topicArn, messageString);
+                return client.PublishAsync(publishRequest);
             }
+        }
+
+        private string EnsureTopic(string topicName, AmazonSimpleNotificationServiceClient client)
+        {
+            var topic = client.FindTopic(topicName);
+            if (topic != null)
+                return topic.TopicArn;
+
+            _logger.DebugFormat("Topic with name {0} does not exist. Creating new topic", topicName);
+            var topicResult = client.CreateTopic(topicName);
+            return topicResult.HttpStatusCode == HttpStatusCode.OK ? topicResult.TopicArn : string.Empty;
         }
 
         public void Dispose()
