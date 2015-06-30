@@ -1,7 +1,11 @@
 ﻿using System;
 using System.Linq;
 
+using Amazon.SimpleNotificationService.Model;
+
 using Machine.Specifications;
+
+using Newtonsoft.Json;
 
 using paramore.brighter.commandprocessor;
 using paramore.brighter.commandprocessor.Logging;
@@ -16,15 +20,24 @@ namespace paramore.commandprocessor.tests.MessagingGateway.awssqs
     [Tags("Requires", new[] { "AWSSDK" })]
     public class AWSSQSMessagingGatewayTests
     {
+        public class TestSQSMessage : Event
+        {
+            public string Body { get; private set; }
+            public TestSQSMessage(Guid id, string body)
+                : base(id)
+            {
+                Body = body;
+            }
+        }
         public class When_posting_a_message_via_the_messaging_gateway
         {
             private Establish context = () =>
             {
                 _queueListener = new TestAWSQueueListener(_queueUrl);
                 var logger = LogProvider.For<RmqMessageConsumer>();
-                _message = new Message(header: new MessageHeader(Guid.NewGuid(), "test1", MessageType.MT_COMMAND), body: new MessageBody("test content"));
+                _message = new Message(header: new MessageHeader(Guid.NewGuid(), "TestSqsTopic", MessageType.MT_COMMAND), body: new MessageBody("test content"));
 
-                _messageProducer = new SqsMessageProducer(_queueUrl, logger);
+                _messageProducer = new SqsMessageProducer(logger);
             };
 
             private Because of = async () =>
@@ -34,54 +47,56 @@ namespace paramore.commandprocessor.tests.MessagingGateway.awssqs
                 task.ContinueWith(
                     x =>
                     {
-                        if(x.IsCompleted)
-                            _listenedMessage = _queueListener.Listen();        
+                        if (x.IsCompleted)
+                        {
+                            _listenedMessage = _queueListener.Listen();
+                        }
                     }).Wait();
             };
 
-            It should_send_the_message_to_aws_sqs = () => _listenedMessage.ShouldNotBeNull();
+            private It should_send_the_message_to_aws_sqs = () => _listenedMessage.Body.ShouldNotBeNull();
 
-            private Cleanup queue = () => _queueListener.Purge(_queueUrl);
+            private Cleanup queue = () => _queueListener.DeleteMessage(_listenedMessage.ReceiptHandle);
 
             private static Message _message;
             private static SqsMessageProducer _messageProducer;
             private static TestAWSQueueListener _queueListener;
-            private static string _listenedMessage;
-            private static string _queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/brighter-test-queue";
+            private static Amazon.SQS.Model.Message _listenedMessage;
+            private static string _queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/TestSqsTopicQueue";
         }
 
-        public class When_posting_a_message_via_the_messaging_gateway_and_queue_does_not_exist
+        public class When_posting_a_message_via_the_messaging_gateway_and_sns_topic_does_not_exist
         {
             private Establish context = () =>
             {
-                _queueListener = new TestAWSQueueListener(_queueUrl);
+                _queueListener = new TestAWSQueueListener();
                 var logger = LogProvider.For<RmqMessageConsumer>();
-                _message = new Message(header: new MessageHeader(Guid.NewGuid(), "test1", MessageType.MT_COMMAND), body: new MessageBody("test content"));
+                _message = new Message(header: new MessageHeader(Guid.NewGuid(), "AnotherTestSqsTopic", MessageType.MT_COMMAND), body: new MessageBody("test content"));
 
-                _messageProducer = new SqsMessageProducer(_queueUrl, logger);
+                _messageProducer = new SqsMessageProducer(logger);
             };
 
             private Because of = async () =>
             {
                 var task = _messageProducer.Send(_message);
-                
+
                 task.ContinueWith(
                     x =>
                     {
-                        if(x.IsCompleted)
-                            _listenedMessage = _queueListener.Listen();        
+                        if (x.IsCompleted)
+                            _topic = _queueListener.CheckSnsTopic(_message.Header.Topic);
                     }).Wait();
             };
 
-            It should_send_the_message_to_aws_sqs = () => _listenedMessage.ShouldNotBeNull();
+            It should_create_topic_and_send_the_message = () => _topic.ShouldNotBeNull();
 
-            private Cleanup queue = () => _queueListener.Purge(_queueUrl);
+            private Cleanup queue = () => _queueListener.DeleteTopic(_message.Header.Topic);
 
             private static Message _message;
             private static SqsMessageProducer _messageProducer;
             private static TestAWSQueueListener _queueListener;
             private static string _listenedMessage;
-            private static string _queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/brighter-test-queue";
+            private static Topic _topic;
         }
     }
 
@@ -93,21 +108,21 @@ namespace paramore.commandprocessor.tests.MessagingGateway.awssqs
         {
             var logger = LogProvider.For<RmqMessageConsumer>();
 
-            var messageHeader = new MessageHeader(Guid.NewGuid(), "test2", MessageType.MT_COMMAND);
+            var messageHeader = new MessageHeader(Guid.NewGuid(), "TestSqsTopic", MessageType.MT_COMMAND);
 
             messageHeader.UpdateHandledCount();
             sentMessage = new Message(header: messageHeader, body: new MessageBody("test content"));
 
-            sender = new SqsMessageProducer(queueUrl, logger);
-            receiver = new SqsMessageConsumer(queueUrl, logger);
-            testQueueListener = new TestAWSQueueListener(queueUrl);
+            sender = new SqsMessageProducer(logger);
+            receiver = new SqsMessageConsumer(_queueUrl, logger);
+            testQueueListener = new TestAWSQueueListener(_queueUrl);
         };
 
         Because of = () => sender.Send(sentMessage).ContinueWith(
             x =>
             {
                 receivedMessage = receiver.Receive(2000);
-                receiver.Acknowledge(receivedMessage);        
+                receiver.Acknowledge(receivedMessage);
             }).Wait();
 
         It should_send_a_message_via_sqs_with_the_matching_body = () => receivedMessage.Body.ShouldEqual(sentMessage.Body);
@@ -118,10 +133,10 @@ namespace paramore.commandprocessor.tests.MessagingGateway.awssqs
         It should_send_a_message_via_sqs_with_the_matching_header_topic = () => receivedMessage.Header.Topic.ShouldEqual(sentMessage.Header.Topic);
         It should_remove_the_message_from_the_queue = () => testQueueListener.Listen().ShouldBeNull();
 
-        Cleanup the_queue = () => testQueueListener.Purge(queueUrl);
+        Cleanup the_queue = () => testQueueListener.DeleteMessage(receivedMessage.Header.Bag["ReceiptHandle"].ToString());
 
         private static TestAWSQueueListener testQueueListener;
-        private static string queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/brighter-test-queue";
+        private static string _queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/TestSqsTopicQueue";
         private static IAmAMessageProducer sender;
         private static IAmAMessageConsumer receiver;
         private static Message sentMessage;
@@ -134,20 +149,22 @@ namespace paramore.commandprocessor.tests.MessagingGateway.awssqs
         {
             var logger = LogProvider.For<RmqMessageConsumer>();
 
-            var messageHeader = new MessageHeader(Guid.NewGuid(), "test2", MessageType.MT_COMMAND);
+            var messageHeader = new MessageHeader(Guid.NewGuid(), "TestSqsTopic", MessageType.MT_COMMAND);
 
             messageHeader.UpdateHandledCount();
             message = new Message(header: messageHeader, body: new MessageBody("test content"));
 
-            sender = new SqsMessageProducer(queueUrl, logger);
+            sender = new SqsMessageProducer(logger);
             receiver = new SqsMessageConsumer(queueUrl, logger);
             testQueueListener = new TestAWSQueueListener(queueUrl);
 
 
             var task = sender.Send(message);
 
-            task.ContinueWith(x => { if (x.IsCompleted)_listenedMessage = receiver.Receive(1000);
-                }).Wait();
+            task.ContinueWith(x =>
+            {
+                if (x.IsCompleted) _listenedMessage = receiver.Receive(1000);
+            }).Wait();
         };
 
         Because i_reject_the_message = () => receiver.Reject(_listenedMessage, true);
@@ -158,10 +175,10 @@ namespace paramore.commandprocessor.tests.MessagingGateway.awssqs
             message.ShouldEqual(_listenedMessage);
         };
 
-        Cleanup the_queue = () => testQueueListener.Purge(queueUrl);
+        Cleanup the_queue = () => testQueueListener.DeleteMessage(_listenedMessage.Header.Bag["ReceiptHandle"].ToString());
 
         private static TestAWSQueueListener testQueueListener;
-        private static string queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/brighter-test-queue";
+        private static string queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/TestSqsTopicQueue";
         private static IAmAMessageProducer sender;
         private static IAmAMessageConsumer receiver;
         private static Message message;
@@ -175,20 +192,22 @@ namespace paramore.commandprocessor.tests.MessagingGateway.awssqs
         {
             var logger = LogProvider.For<RmqMessageConsumer>();
 
-            var messageHeader = new MessageHeader(Guid.NewGuid(), "test2", MessageType.MT_COMMAND);
+            var messageHeader = new MessageHeader(Guid.NewGuid(), "TestSqsTopic", MessageType.MT_COMMAND);
 
             messageHeader.UpdateHandledCount();
             message = new Message(header: messageHeader, body: new MessageBody("test content"));
 
-            sender = new SqsMessageProducer(queueUrl, logger);
+            sender = new SqsMessageProducer(logger);
             receiver = new SqsMessageConsumer(queueUrl, logger);
             testQueueListener = new TestAWSQueueListener(queueUrl);
 
 
             var task = sender.Send(message);
 
-            task.ContinueWith(x => { if (x.IsCompleted)_listenedMessage = receiver.Receive(1000);
-                }).Wait();
+            task.ContinueWith(x =>
+            {
+                if (x.IsCompleted) _listenedMessage = receiver.Receive(1000);
+            }).Wait();
         };
 
         Because i_reject_the_message = () => receiver.Reject(_listenedMessage, false);
@@ -198,10 +217,10 @@ namespace paramore.commandprocessor.tests.MessagingGateway.awssqs
             testQueueListener.Listen().ShouldBeNull();
         };
 
-        Cleanup the_queue = () => testQueueListener.Purge(queueUrl);
+        Cleanup the_queue = () => testQueueListener.DeleteMessage(_listenedMessage.Header.Bag["ReceiptHandle"].ToString());
 
         private static TestAWSQueueListener testQueueListener;
-        private static string queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/brighter-test-queue";
+        private static string queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/TestSqsTopicQueue";
         private static IAmAMessageProducer sender;
         private static IAmAMessageConsumer receiver;
         private static Message message;
@@ -215,12 +234,12 @@ namespace paramore.commandprocessor.tests.MessagingGateway.awssqs
         {
             var logger = LogProvider.For<RmqMessageConsumer>();
 
-            var messageHeader = new MessageHeader(Guid.NewGuid(), "test2", MessageType.MT_COMMAND);
+            var messageHeader = new MessageHeader(Guid.NewGuid(), "TestSqsTopic", MessageType.MT_COMMAND);
 
             messageHeader.UpdateHandledCount();
             sentMessage = new Message(header: messageHeader, body: new MessageBody("test content"));
 
-            sender = new SqsMessageProducer(queueUrl, logger);
+            sender = new SqsMessageProducer(logger);
             receiver = new SqsMessageConsumer(queueUrl, logger);
             testQueueListener = new TestAWSQueueListener(queueUrl);
         };
@@ -230,11 +249,9 @@ namespace paramore.commandprocessor.tests.MessagingGateway.awssqs
 
         It should_clean_the_queue = () => testQueueListener.Listen().ShouldBeNull();
 
-        Cleanup the_queue = () => testQueueListener.Purge(queueUrl);
-        
         private static TestAWSQueueListener testQueueListener;
         private static IAmAMessageProducer sender;
-        private static string queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/brighter-test-queue"; 
+        private static string queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/TestSqsTopicQueue";
         private static IAmAMessageConsumer receiver;
         private static Message sentMessage;
     }
@@ -245,12 +262,12 @@ namespace paramore.commandprocessor.tests.MessagingGateway.awssqs
         {
             var logger = LogProvider.For<RmqMessageConsumer>();
 
-            var messageHeader = new MessageHeader(Guid.NewGuid(), "test2", MessageType.MT_COMMAND);
+            var messageHeader = new MessageHeader(Guid.NewGuid(), "TestSqsTopic", MessageType.MT_COMMAND);
 
             messageHeader.UpdateHandledCount();
             sentMessage = new Message(header: messageHeader, body: new MessageBody("test content"));
 
-            sender = new SqsMessageProducer(queueUrl, logger);
+            sender = new SqsMessageProducer(logger);
             receiver = new SqsMessageConsumer(queueUrl, logger);
             testQueueListener = new TestAWSQueueListener(queueUrl);
         };
@@ -259,20 +276,27 @@ namespace paramore.commandprocessor.tests.MessagingGateway.awssqs
             x =>
             {
                 receivedMessage = receiver.Receive(2000);
+                receivedReceiptHandle = receivedMessage.Header.Bag["ReceiptHandle"].ToString();
                 receiver.Requeue(receivedMessage);
             }).Wait();
 
-        It should_delete_the_original_message_and_create_new_message = () => {
-            var message = receiver.Receive(1000);
-            message.Body.Value.ShouldEqual(receivedMessage.Body.Value);
-            message.Header.Bag["ReceiptHandle"].ToString().ShouldNotEqual(receivedMessage.Header.Bag["ReceiptHandle"].ToString());
+        It should_delete_the_original_message_and_create_new_message = () =>
+        {
+            requeuedMessage = receiver.Receive(1000);
+            requeuedMessage.Body.Value.ShouldEqual(receivedMessage.Body.Value);
+            requeuedMessage.Header.Bag["ReceiptHandle"].ToString().ShouldNotEqual(receivedReceiptHandle);
+            
         };
+
+        Cleanup the_queue = () => testQueueListener.DeleteMessage(requeuedMessage.Header.Bag["ReceiptHandle"].ToString());
 
         private static TestAWSQueueListener testQueueListener;
         private static IAmAMessageProducer sender;
-        private static string queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/brighter-test-queue";
+        private static string queueUrl = "https://sqs.eu-west-1.amazonaws.com/027649620536/TestSqsTopicQueue";
         private static IAmAMessageConsumer receiver;
         private static Message sentMessage;
+        private static Message requeuedMessage;
         private static Message receivedMessage;
+        private static string receivedReceiptHandle;
     }
 }

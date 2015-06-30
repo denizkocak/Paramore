@@ -2,11 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 
 using Amazon.SQS;
 using Amazon.SQS.Model;
 
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 using paramore.brighter.commandprocessor.Logging;
 
@@ -47,7 +49,7 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
             using (var client = new AmazonSQSClient())
             {
                 var response = client.ReceiveMessage(request);
-
+                
                 if (response.HttpStatusCode != HttpStatusCode.OK) 
                     return message;
 
@@ -57,8 +59,23 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
                 if(!response.Messages.Any())
                     return message;
 
-                message = response.Messages.First().ToMessage();
+                var rawSqsMessage = response.Messages.First();
+                var sqsmessage = JsonConvert.DeserializeObject<SqsMessage>(rawSqsMessage.Body);
 
+                var contractResolver = new MessageDefaultContractResolver();
+                var settings = new JsonSerializerSettings { ContractResolver = contractResolver };
+
+                if (sqsmessage.Message == null)
+                {
+                    message = JsonConvert.DeserializeObject<Message>(rawSqsMessage.Body, settings);
+                }
+                else
+                {
+                    message = JsonConvert.DeserializeObject<Message>(sqsmessage.Message, settings);
+                }
+
+                message.Header.Bag.Add("ReceiptHandle", rawSqsMessage.ReceiptHandle);
+                
                 _logger.InfoFormat("SqsMessageConsumer: Received message from queue {0}, message: {1}{2}",
                         _queueUrl, Environment.NewLine, JsonConvert.SerializeObject(message));
             }
@@ -145,14 +162,16 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
         {
             try
             {
+                Reject(message, false);
+                
                 using (var client = new AmazonSQSClient())
                 {
                     _logger.InfoFormat("SqsMessageConsumer: requeueing the message {0}", message.Id);
 
-                    client.SendMessage(_queueUrl, message.Body.Value);
-                }
+                    message.Header.Bag.Remove("ReceiptHandle");
 
-                Reject(message, false);
+                    client.SendMessage(_queueUrl, JsonConvert.SerializeObject(message));
+                }
 
                 _logger.InfoFormat("SqsMessageConsumer: requeued the message {0}", message.Id);
             }
@@ -168,4 +187,24 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
             
         }
     }
+
+    public class MessageDefaultContractResolver : DefaultContractResolver
+{
+    protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
+    {
+        var prop = base.CreateProperty(member, memberSerialization);
+ 
+        if (!prop.Writable)
+        {
+            var property = member as PropertyInfo;
+            if (property != null)
+            {
+                var hasPrivateSetter = property.GetSetMethod(true) != null;
+                prop.Writable = hasPrivateSetter;
+            }
+        }
+ 
+        return prop;
+    }
+}
 }
