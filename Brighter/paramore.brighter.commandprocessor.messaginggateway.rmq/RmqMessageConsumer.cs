@@ -55,10 +55,11 @@ namespace paramore.brighter.commandprocessor.messaginggateway.rmq
     /// inter-process communication tasks from the server. It handles connection establishment, request reception and dispatching, 
     /// result sending, and error handling.
     /// </summary>
-    public class RmqMessageConsumer : MessageGateway, IAmAMessageConsumer
+    public class RmqMessageConsumer : MessageGateway, IAmAMessageConsumerSupportingDelay
     {
         private readonly string _queueName;
         private readonly string _routingKey;
+        private readonly bool _isDurable;
         private const bool AutoAck = false;
         /// <summary>
         /// The consumer
@@ -69,13 +70,15 @@ namespace paramore.brighter.commandprocessor.messaginggateway.rmq
         /// <summary>
         /// Initializes a new instance of the <see cref="MessageGateway" /> class.
         /// </summary>
-        /// <param name="routingKey">The routing key.</param>
-        /// <param name="logger">The logger.</param>
         /// <param name="queueName">The queue name.</param>
-        public RmqMessageConsumer(string queueName, string routingKey, ILog logger) : base(logger)
+        /// <param name="routingKey">The routing key.</param>
+        /// <param name="isDurable"></param>
+        /// <param name="logger">The logger.</param>
+        public RmqMessageConsumer(string queueName, string routingKey, bool isDurable, ILog logger) : base(logger)
         {
             _queueName = queueName;
             _routingKey = routingKey;
+            _isDurable = isDurable;
             _messageCreator = new RmqMessageCreator(logger);
         }
 
@@ -125,12 +128,17 @@ namespace paramore.brighter.commandprocessor.messaginggateway.rmq
 
         public void Requeue(Message message)
         {
+            this.Requeue(message, 0);
+        }
+
+        public void Requeue(Message message, int delayMilliseconds)
+        {
             try
             {
+                Logger.DebugFormat("RmqMessageConsumer: Re-queueing message {0} with a delay of {1} milliseconds", message.Id, delayMilliseconds);
                 EnsureChannel(_queueName);
-                var rmqMessagePublisher = new RmqMessagePublisher(Channel, Configuration.Exchange.Name);
-                Logger.DebugFormat("RmqMessageConsumer: Re-queueing message {0}", message.Id);
-                rmqMessagePublisher.PublishMessage(message);
+                var rmqMessagePublisher = new RmqMessagePublisher(Channel, Configuration.Exchange.Name, Logger);
+                rmqMessagePublisher.PublishMessage(message, delayMilliseconds, regenerate: true);
                 Reject(message, false);
             }
             catch (Exception exception)
@@ -287,7 +295,7 @@ namespace paramore.brighter.commandprocessor.messaginggateway.rmq
 
             Logger.DebugFormat("RMQMessagingGateway: Creating queue {0} on connection {1}", _queueName, Configuration.AMPQUri.GetSanitizedUri());
 
-            Channel.QueueDeclare(_queueName, false, false, false, SetQueueArguments());
+            Channel.QueueDeclare(_queueName, _isDurable, false, false, SetQueueArguments());
 
             Channel.QueueBind(_queueName, Configuration.Exchange.Name, _routingKey);
         }

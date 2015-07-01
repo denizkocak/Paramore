@@ -52,6 +52,7 @@
     <Compile Include="SqsMessageConsumer.cs" />
     <Compile Include="SqsMessageConsumerFactory.cs" />
     <Compile Include="SqsMessageProducer.cs" />
+    <Compile Include="SqsMessageProducerFactory.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

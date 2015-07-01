@@ -28,6 +28,7 @@ using DocumentsAndFolders.Sqs.Ports.DB;
 using DocumentsAndFolders.Sqs.Ports.Events;
 
 using paramore.brighter.commandprocessor;
+using paramore.brighter.commandprocessor.actions;
 using paramore.brighter.commandprocessor.Logging;
 using paramore.brighter.serviceactivator;
 
@@ -49,7 +50,7 @@ namespace Greetings.Ports.CommandHandlers
             if (FakeDB.Instance.GetFolder(@event.FolderId) == null)
             {
                 Console.WriteLine("Folder {0} does not exist for the document {1}. Will requeue", @event.FolderId, @event.DocumentId);
-                throw new RequeueException();
+                throw new DeferMessageAction();
             }
 
             FakeDB.Instance.AddUpdateDocument(new Document(@event.DocumentId, @event.FolderId, @event.Title));

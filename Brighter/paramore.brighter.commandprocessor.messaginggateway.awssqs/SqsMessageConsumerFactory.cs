@@ -11,7 +11,7 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
             _logger = logger;
         }
 
-        public IAmAMessageConsumer Create(string queueName, string routingKey)
+        public IAmAMessageConsumer Create(string queueName, string routingKey, bool isDurable)
         {
             return new SqsMessageConsumer(queueName, _logger);
         }

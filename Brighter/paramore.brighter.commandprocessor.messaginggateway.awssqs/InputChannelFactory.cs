@@ -3,36 +3,35 @@
     public class InputChannelFactory : IAmAChannelFactory
     {
         private readonly SqsMessageConsumerFactory _messageConsumerFactory;
+        private readonly SqsMessageProducerFactory _messageProducerFactory;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="InputChannelFactory"/> class.
         /// </summary>
         /// <param name="messageConsumerFactory">The messageConsumerFactory.</param>
-        public InputChannelFactory(SqsMessageConsumerFactory messageConsumerFactory)
+        /// <param name="messageProducerFactory">The messageProducerFactory.</param>
+        public InputChannelFactory(SqsMessageConsumerFactory messageConsumerFactory, SqsMessageProducerFactory messageProducerFactory)
         {
             _messageConsumerFactory = messageConsumerFactory;
+            _messageProducerFactory = messageProducerFactory;
         }
-
+        
         /// <summary>
         /// Creates the input channel.
         /// </summary>
         /// <param name="channelName">Name of the channel.</param>
         /// <param name="routingKey">The routing key.</param>
+        /// <param name="isDurable"></param>
         /// <returns>IAmAnInputChannel.</returns>
-        public IAmAnInputChannel CreateInputChannel(string channelName, string routingKey)
+        ///
+        public IAmAnInputChannel CreateInputChannel(string channelName, string routingKey, bool isDurable)
         {
-            return new InputChannel(channelName, _messageConsumerFactory.Create(channelName, routingKey));
+            return new InputChannel(channelName, _messageConsumerFactory.Create(channelName, routingKey, isDurable));
         }
 
-        /// <summary>
-        /// Creates the output channel.
-        /// </summary>
-        /// <param name="channelName">Name of the channel.</param>
-        /// <param name="routingKey">The routing key.</param>
-        /// <returns>IAmAnInputChannel.</returns>
-        public IAmAnInputChannel CreateOutputChannel(string channelName, string routingKey)
+        public IAmAnOutputChannel CreateOutputChannel(string routingKey)
         {
-            return new InputChannel(channelName, _messageConsumerFactory.Create(channelName, routingKey));
+            return new OutputChannel(_messageProducerFactory.Create());
         }
     }
 }

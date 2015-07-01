@@ -26,6 +26,7 @@ using System;
 using System.Collections.Generic;
 
 using paramore.brighter.commandprocessor;
+using paramore.brighter.commandprocessor.actions;
 using paramore.brighter.serviceactivator;
 
 using Raven.Database.Indexing;
@@ -106,7 +107,7 @@ namespace paramore.commandprocessor.tests.MessageDispatch.TestDoubles
         {
             base.Send(command);
             SendCount++;
-            throw new RequeueException();
+            throw new DeferMessageAction();
         }
 
         public override void Publish<T>(T @event)
@@ -115,11 +116,11 @@ namespace paramore.commandprocessor.tests.MessageDispatch.TestDoubles
             PublishCount++;
 
             var exceptions = new List<Exception>();
-            exceptions.Add(new RequeueException());
+            exceptions.Add(new DeferMessageAction());
             throw new AggregateException("Failed to publish to one more handlers successfully, see inner exceptions for details", exceptions);
 
 
-            throw new RequeueException();
+            throw new DeferMessageAction();
         }
     }
 }

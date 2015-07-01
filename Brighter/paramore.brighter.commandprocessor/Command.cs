@@ -3,8 +3,8 @@
 // Author           : ian
 // Created          : 07-01-2014
 //
-// Last Modified By : ian
-// Last Modified On : 07-01-2014
+// Last Modified By : ian, toby
+// Last Modified On : 07-01-2014, 03-06-2015
 // ***********************************************************************
 //     Copyright (c) . All rights reserved.
 // </copyright>
@@ -42,14 +42,13 @@ namespace paramore.brighter.commandprocessor
     /// <summary>
     /// A command is an imperative instruction to do something. We expect only one receiver of a command because it is point-to-point
     /// </summary>
-    [Serializable]
     public class Command : ICommand
     {
         /// <summary>
         /// Gets or sets the identifier.
         /// </summary>
         /// <value>The identifier.</value>
-        public Guid Id { get; private set; }
+        public Guid Id { get; set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Command"/> class.

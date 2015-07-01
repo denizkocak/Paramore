@@ -40,6 +40,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using paramore.brighter.commandprocessor;
 using paramore.brighter.commandprocessor.Logging;
+using paramore.brighter.commandprocessor.actions;
 using ConfigurationException = paramore.brighter.commandprocessor.ConfigurationException;
 
 namespace paramore.brighter.serviceactivator
@@ -71,6 +72,10 @@ namespace paramore.brighter.serviceactivator
         /// </summary>
         /// <value>The requeue count.</value>
         public int RequeueCount { get; set; }
+        /// <summary>
+        /// Gets or sets number of milliseconds to delay delivery of re-queued messages.
+        /// </summary>
+        public int RequeueDelayInMilliseconds { get; set; }
         /// <summary>
         /// Gets or Sets the unacceptable message limit, once the limit is reached the 
         /// </summary>
@@ -161,7 +166,7 @@ namespace paramore.brighter.serviceactivator
                 }
 
                 // Serviceable message
-                try 
+                try
                 {
                     DispatchRequest(message.Header.MessageType, TranslateMessage(message));
                 }
@@ -177,28 +182,37 @@ namespace paramore.brighter.serviceactivator
                     Channel.Dispose();
                     break;
                 }
-                catch (RequeueException) {
+                catch (DeferMessageAction)
+                {
                     RequeueMessage(message);
+                    continue;
                 }
                 catch (AggregateException aggregateException)
                 {
                     var stop = false;
+                    var requeue = false;
                     foreach (var exception in aggregateException.InnerExceptions)
                     {
-                        if (exception is RequeueException) {
-                            RequeueMessage(message);
-                        }
-                        else if (exception is ConfigurationException)
+                        if (exception is DeferMessageAction)
                         {
-                            if (Logger != null)
-                                Logger.DebugException(
-                                    "MessagePump: Stopping receiving of messages from {1} on thread # {0}",
-                                    exception,
-                                    Thread.CurrentThread.ManagedThreadId,
-                                    Channel.Name);
+                            requeue = true;
+                            continue;
+                        }
+
+                        if (exception is ConfigurationException)
+                        {
+                            if (Logger != null) Logger.DebugException("MessagePump: Stopping receiving of messages from {1} on thread # {0}", exception, Thread.CurrentThread.ManagedThreadId, Channel.Name);
                             stop = true;
                             break;
                         }
+
+                        if (Logger != null) Logger.ErrorException("MessagePump: Failed to dispatch message from {1} on thread # {0}", exception, Thread.CurrentThread.ManagedThreadId, Channel.Name);
+                    }
+
+                    if (requeue)
+                    {
+                        RequeueMessage(message);
+                        continue;
                     }
 
                     if (stop)
@@ -210,7 +224,12 @@ namespace paramore.brighter.serviceactivator
                 }
                 catch (MessageMappingException messageMappingException)
                 {
-                    if (Logger != null) Logger.WarnException("MessagePump: Failed to map the message from {1} on thread # {0}", messageMappingException, Thread.CurrentThread.ManagedThreadId, Channel.Name);
+                    if (Logger != null)
+                        Logger.WarnException(
+                            "MessagePump: Failed to map the message from {1} on thread # {0}",
+                            messageMappingException,
+                            Thread.CurrentThread.ManagedThreadId,
+                            Channel.Name);
                     if (UnacceptableMessageLimitReached())
                     {
                         AcknowledgeMessage(message);
@@ -296,7 +315,16 @@ namespace paramore.brighter.serviceactivator
             {
                 if (message.HandledCountReached(RequeueCount))
                 {
-                    if (Logger != null) Logger.WarnFormat("MessagePump: Have tried {2} times to handle this message {0} from {3} on thread # {1}, dropping message", message.Id, Thread.CurrentThread.ManagedThreadId, RequeueCount, Channel.Name);
+                    var originalMessageId = message.Header.Bag.ContainsKey(Message.OriginalMessageIdHeaderName) ? message.Header.Bag[Message.OriginalMessageIdHeaderName].ToString() : null;
+
+                    if (Logger != null) 
+                        Logger.WarnFormat(
+                            "MessagePump: Have tried {2} times to handle this message {0}{4} from {3} on thread # {1}, dropping message", 
+                            message.Id, 
+                            Thread.CurrentThread.ManagedThreadId, 
+                            RequeueCount, 
+                            Channel.Name,
+                            string.IsNullOrEmpty(originalMessageId) ? string.Empty : string.Format(" (original message id {0})", originalMessageId));
 
                     AcknowledgeMessage(message);
                     return;
@@ -305,7 +333,7 @@ namespace paramore.brighter.serviceactivator
 
             if (Logger != null) Logger.DebugFormat("MessagePump: Re-queueing message {0} from {2} on thread # {1}", message.Id, Thread.CurrentThread.ManagedThreadId, Channel.Name);
 
-            Channel.Requeue(message);
+            Channel.Requeue(message, RequeueDelayInMilliseconds);
         }
 
         private TRequest TranslateMessage(Message message)
@@ -323,7 +351,7 @@ namespace paramore.brighter.serviceactivator
             {
                 request = _messageMapper.MapToRequest(message);
             }
-            catch (Exception exception) 
+            catch (Exception exception)
             {
                 throw new MessageMappingException(string.Format("Failed to map message {0} using message mapper {1} for type {2} ", message.Id, _messageMapper.GetType().FullName, typeof(TRequest).FullName), exception);
             }
@@ -334,6 +362,6 @@ namespace paramore.brighter.serviceactivator
 
     internal class MessageMappingException : Exception
     {
-        public MessageMappingException(string message, Exception exception): base(message, exception)  {}
+        public MessageMappingException(string message, Exception exception) : base(message, exception) { }
     }
 }

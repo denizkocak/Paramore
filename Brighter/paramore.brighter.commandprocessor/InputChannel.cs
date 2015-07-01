@@ -37,6 +37,7 @@ THE SOFTWARE. */
 
 using System;
 using System.Collections.Concurrent;
+using System.Threading.Tasks;
 
 namespace paramore.brighter.commandprocessor
 {
@@ -47,26 +48,28 @@ namespace paramore.brighter.commandprocessor
     /// </summary>
     public class InputChannel : IAmAnInputChannel
     {
-        private readonly string _queueName;
+        private readonly string _channelName;
         private readonly IAmAMessageConsumer _messageConsumer;
         private readonly ConcurrentQueue<Message> _queue = new ConcurrentQueue<Message>();
+        private readonly bool _messageConsumerSupportsDelay;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="InputChannel"/> class.
         /// </summary>
         /// <param name="queueName">Name of the queue.</param>
         /// <param name="messageConsumer">The messageConsumer.</param>
-        public InputChannel(string queueName, IAmAMessageConsumer messageConsumer)
+        public InputChannel(string channelName, IAmAMessageConsumer messageConsumer)
         {
-            _queueName = queueName;
+            _channelName = channelName;
             _messageConsumer = messageConsumer;
+            _messageConsumerSupportsDelay = _messageConsumer is IAmAMessageConsumerSupportingDelay && (_messageConsumer as IAmAMessageGatewaySupportingDelay).DelaySupported;
         }
 
         /// <summary>
         /// Gets the name.
         /// </summary>
         /// <value>The name.</value>
-        public ChannelName Name { get { return new ChannelName(_queueName); } }
+        public ChannelName Name { get { return new ChannelName(_channelName); } }
 
         /// <summary>
         /// Receives the specified timeout in milliseconds.
@@ -113,9 +116,15 @@ namespace paramore.brighter.commandprocessor
         /// Requeues the specified message.
         /// </summary>
         /// <param name="message"></param>
-        public void Requeue(Message message)
+        public void Requeue(Message message, int delayMilliseconds = 0)
         {
-            _messageConsumer.Requeue(message);
+            if (delayMilliseconds > 0 && !_messageConsumerSupportsDelay)
+                Task.Delay(delayMilliseconds).Wait();
+
+            if (_messageConsumerSupportsDelay)
+                (_messageConsumer as IAmAMessageConsumerSupportingDelay).Requeue(message, delayMilliseconds);
+            else
+                _messageConsumer.Requeue(message);
         }
 
         /// <summary>

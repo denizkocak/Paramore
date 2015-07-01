@@ -28,14 +28,14 @@ namespace paramore.brighter.serviceactivator.TestHelpers
 {
     public class InMemoryChannelFactory : IAmAChannelFactory
     {
-        public IAmAnInputChannel CreateInputChannel(string channelName, string routingKey)
+        public IAmAnInputChannel CreateInputChannel(string channelName, string routingKey, bool isDurable)
         {
             return new FakeChannel(channelName, routingKey);
         }
 
-        public IAmAnInputChannel CreateOutputChannel(string channelName, string routingKey)
+        public IAmAnOutputChannel CreateOutputChannel(string routingKey)
         {
-            return new FakeChannel(channelName, routingKey);
+            return new FakeChannel(routingKey);
         }
     }
 }

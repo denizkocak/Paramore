@@ -98,6 +98,7 @@ namespace DocumentsAndFolders.Sqs.Adapters.ServiceHost
             };
             
             var sqsMessageConsumerFactory = new SqsMessageConsumerFactory(logger);
+            var sqsMessageProducerFactory = new SqsMessageProducerFactory(logger);
 
             var builder = DispatchBuilder
                 .With()
@@ -111,7 +112,7 @@ namespace DocumentsAndFolders.Sqs.Adapters.ServiceHost
                     .Build()
                  )
                  .MessageMappers(messageMapperRegistry)
-                 .ChannelFactory(new InputChannelFactory(sqsMessageConsumerFactory))
+                 .ChannelFactory(new InputChannelFactory(sqsMessageConsumerFactory, sqsMessageProducerFactory))
                  .ConnectionsFromConfiguration();
             _dispatcher = builder.Build();
         }

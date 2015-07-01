@@ -49,10 +49,5 @@ namespace paramore.brighter.commandprocessor
         /// </summary>
         /// <value>The length.</value>
         int Length { get; }
-        /// <summary>
-        /// Gets the name.
-        /// </summary>
-        /// <value>The name.</value>
-        ChannelName Name { get; }
     }
 }

@@ -14,7 +14,7 @@ using TimeSpan = System.TimeSpan;
 
 namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
 {
-    public class SqsMessageConsumer : IAmAMessageConsumer
+    public class SqsMessageConsumer : IAmAMessageConsumerSupportingDelay
     {
         private readonly ILog _logger;
         private readonly string _queueUrl;
@@ -23,7 +23,10 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
         {
             _logger = logger;
             _queueUrl = queueUrl;
+            DelaySupported = true;
         }
+
+        public bool DelaySupported { get; private set; }
 
         public Message Receive(int timeoutInMilliseconds)
         {
@@ -143,17 +146,26 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
 
         public void Requeue(Message message)
         {
+            Requeue(message, 0);
+        }
+
+        public void Requeue(Message message, int delayMilliseconds)
+        {
             try
             {
                 Reject(message, false);
-                
+
                 using (var client = new AmazonSQSClient())
                 {
                     _logger.InfoFormat("SqsMessageConsumer: requeueing the message {0}", message.Id);
 
                     message.Header.Bag.Remove("ReceiptHandle");
+                    var request = new SendMessageRequest(_queueUrl, JsonConvert.SerializeObject(message))
+                                  {
+                                      DelaySeconds = (int)TimeSpan.FromMilliseconds(delayMilliseconds).TotalSeconds
+                                  };
 
-                    client.SendMessage(_queueUrl, JsonConvert.SerializeObject(message));
+                    client.SendMessage(request);
                 }
 
                 _logger.InfoFormat("SqsMessageConsumer: requeued the message {0}", message.Id);
