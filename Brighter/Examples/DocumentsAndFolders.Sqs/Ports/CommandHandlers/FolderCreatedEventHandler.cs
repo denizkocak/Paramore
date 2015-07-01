@@ -1,5 +1,6 @@
 ﻿using System;
 
+using DocumentsAndFolders.Sqs.Ports.DB;
 using DocumentsAndFolders.Sqs.Ports.Events;
 
 using paramore.brighter.commandprocessor;
@@ -18,6 +19,9 @@ namespace Greetings.Ports.CommandHandlers
             Console.WriteLine("FolderId: {0}, Title: {1}", @event.FolderId, @event.Title);
             Console.WriteLine("----------------------------------");
             Console.WriteLine("Message Ends");
+
+
+            FakeDB.Instance.AddUpdateFolder(new Folder(@event.FolderId, @event.Title));
             
             return base.Handle(@event);
         }
