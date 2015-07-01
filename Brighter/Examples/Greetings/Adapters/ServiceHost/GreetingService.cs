@@ -28,8 +28,7 @@ using Greetings.Ports.Commands;
 using Greetings.Ports.Mappers;
 using paramore.brighter.commandprocessor;
 using paramore.brighter.commandprocessor.Logging;
-using paramore.brighter.commandprocessor.messaginggateway.awssqs;
-//using paramore.brighter.commandprocessor.messaginggateway.rmq;
+using paramore.brighter.commandprocessor.messaginggateway.rmq;
 using paramore.brighter.serviceactivator;
 using Polly;
 using TinyIoC;
@@ -84,24 +83,7 @@ namespace Greetings.Adapters.ServiceHost
             };
 
             //create the gateway
-            //var rmqMessageConsumerFactory = new RmqMessageConsumerFactory(logger);
-
-            //var builder = DispatchBuilder
-            //    .With()
-            //    .Logger(logger)
-            //    .CommandProcessor(CommandProcessorBuilder.With()
-            //        .Handlers(new HandlerConfiguration(subscriberRegistry, handlerFactory))
-            //        .Policies(policyRegistry)
-            //        .Logger(logger)
-            //        .NoTaskQueues()
-            //        .RequestContextFactory(new InMemoryRequestContextFactory())
-            //        .Build()
-            //     )
-            //     .MessageMappers(messageMapperRegistry)
-            //     .ChannelFactory(new InputChannelFactory(rmqMessageConsumerFactory))
-            //     .ConnectionsFromConfiguration();
-
-            var sqsMessageConsumerFactory = new SqsMessageConsumerFactory(logger);
+            var rmqMessageConsumerFactory = new RmqMessageConsumerFactory(logger);
 
             var builder = DispatchBuilder
                 .With()
@@ -115,8 +97,9 @@ namespace Greetings.Adapters.ServiceHost
                     .Build()
                  )
                  .MessageMappers(messageMapperRegistry)
-                 .ChannelFactory(new InputChannelFactory(sqsMessageConsumerFactory))
+                 .ChannelFactory(new InputChannelFactory(rmqMessageConsumerFactory))
                  .ConnectionsFromConfiguration();
+
             _dispatcher = builder.Build();
         }
 
