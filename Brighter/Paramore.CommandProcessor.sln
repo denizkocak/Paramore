@@ -50,6 +50,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "paramore.brighter.commandpr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "paramore.brighter.commandprocessor.messaginggateway.awssqs", "paramore.brighter.commandprocessor.messaginggateway.awssqs\paramore.brighter.commandprocessor.messaginggateway.awssqs.csproj", "{BD921F35-47C9-41BA-B1BC-AE9698869977}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocumentsAndFolders.Sqs", "Examples\DocumentsAndFolders.Sqs\DocumentsAndFolders.Sqs.csproj", "{B75121F4-0181-4A8F-AE25-529D64B1F694}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocumentsAndFolders.Sqs.EventsGenerator", "Examples\DocumentsAndFolders.Sqs.EventsGenerator\DocumentsAndFolders.Sqs.EventsGenerator.csproj", "{CCB66D33-E9EF-45AC-8F2E-7ABDC2D03C7C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -242,7 +246,5 @@ Global
 		{33C68FFA-F7FC-4475-A413-63AC036C201A} = {235DE1F1-E71B-4817-8E27-3B34FF006E4C}
 		{A58FD535-81C2-4E96-87FC-DDC034E56EEE} = {235DE1F1-E71B-4817-8E27-3B34FF006E4C}
 		{23519DAF-76E5-4243-B231-5550F87698E8} = {235DE1F1-E71B-4817-8E27-3B34FF006E4C}
-		{CC48B432-25E3-4497-B468-7719E2CF86E4} = {235DE1F1-E71B-4817-8E27-3B34FF006E4C}
-		{E35E86B3-B479-45D9-8A55-D9EA3EF7730B} = {329736D2-BF92-4D06-A7BF-19F4B6B64EDD}
 	EndGlobalSection
 EndGlobal

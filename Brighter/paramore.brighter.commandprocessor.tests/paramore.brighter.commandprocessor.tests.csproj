@@ -37,7 +37,11 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="EventStore.ClientAPI">
+    <Reference Include="AWSSDK, Version=2.3.44.0, Culture=neutral, PublicKeyToken=9f476d3089b52be3, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\AWSSDK.2.3.44.0\lib\net45\AWSSDK.dll</HintPath>
+    </Reference>
+<Reference Include="EventStore.ClientAPI">
       <HintPath>..\packages\EventStore.Client.3.0.2\lib\net40\EventStore.ClientAPI.dll</HintPath>
     </Reference>
     <Reference Include="EventStore.ClientAPI.Embedded">

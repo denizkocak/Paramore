@@ -2,13 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Reflection;
 
 using Amazon.SQS;
 using Amazon.SQS.Model;
 
 using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 
 using paramore.brighter.commandprocessor.Logging;
 
@@ -35,15 +33,7 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
             var request = new ReceiveMessageRequest(_queueUrl)
                           {
                               MaxNumberOfMessages = 1,
-                              WaitTimeSeconds = (int)TimeSpan.FromMilliseconds(timeoutInMilliseconds).TotalSeconds,
-                              MessageAttributeNames = new List<string>
-                                                      {
-                                                          SqsMessageAttributes.TOPIC, 
-                                                          SqsMessageAttributes.MESSAGE_ID, 
-                                                          SqsMessageAttributes.MESSAGE_TYPE, 
-                                                          SqsMessageAttributes.HANDLED_COUNT, 
-                                                          SqsMessageAttributes.TIMESTAMP 
-                                                      }
+                              WaitTimeSeconds = (int)TimeSpan.FromMilliseconds(timeoutInMilliseconds).TotalSeconds
                           };
 
             using (var client = new AmazonSQSClient())
@@ -65,14 +55,7 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
                 var contractResolver = new MessageDefaultContractResolver();
                 var settings = new JsonSerializerSettings { ContractResolver = contractResolver };
 
-                if (sqsmessage.Message == null)
-                {
-                    message = JsonConvert.DeserializeObject<Message>(rawSqsMessage.Body, settings);
-                }
-                else
-                {
-                    message = JsonConvert.DeserializeObject<Message>(sqsmessage.Message, settings);
-                }
+                message = JsonConvert.DeserializeObject<Message>(sqsmessage.Message ?? rawSqsMessage.Body, settings);
 
                 message.Header.Bag.Add("ReceiptHandle", rawSqsMessage.ReceiptHandle);
                 
@@ -187,24 +170,4 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
             
         }
     }
-
-    public class MessageDefaultContractResolver : DefaultContractResolver
-{
-    protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
-    {
-        var prop = base.CreateProperty(member, memberSerialization);
- 
-        if (!prop.Writable)
-        {
-            var property = member as PropertyInfo;
-            if (property != null)
-            {
-                var hasPrivateSetter = property.GetSetMethod(true) != null;
-                prop.Writable = hasPrivateSetter;
-            }
-        }
- 
-        return prop;
-    }
-}
 }
