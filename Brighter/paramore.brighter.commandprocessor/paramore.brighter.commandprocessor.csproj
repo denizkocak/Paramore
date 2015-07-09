@@ -63,6 +63,7 @@
     <Compile Include="IAmAChannel.cs" />
     <Compile Include="IAmAChannelFactory.cs" />
     <Compile Include="IAmACommandStore.cs" />
+    <Compile Include="IAmAMessageGatewaySupportingCache.cs" />
     <Compile Include="IAmAMessageProducerFactory.cs" />
     <Compile Include="IAmAMessageConsumerFactory.cs" />
     <Compile Include="IAmAMessageGatewaySupportingDelay.cs" />

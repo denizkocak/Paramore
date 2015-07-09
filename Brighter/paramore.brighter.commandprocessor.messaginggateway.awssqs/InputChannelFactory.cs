@@ -15,15 +15,15 @@
             _messageConsumerFactory = messageConsumerFactory;
             _messageProducerFactory = messageProducerFactory;
         }
-        
-        /// <summary>
-        /// Creates the input channel.
-        /// </summary>
-        /// <param name="channelName">Name of the channel.</param>
-        /// <param name="routingKey">The routing key.</param>
-        /// <param name="isDurable"></param>
+
+        ///  <summary>
+        ///  Creates the input channel.
+        ///  </summary>
+        ///  <param name="channelName">Name of the channel.</param>
+        ///  <param name="routingKey">The routing key.</param>
+        ///  <param name="isDurable"></param>
+        /// <param name="noOfCachedMessages">Number of messages to cache in memory. It will be set by the noOfPerformers value which is defined for queue</param>
         /// <returns>IAmAnInputChannel.</returns>
-        ///
         public IAmAnInputChannel CreateInputChannel(string channelName, string routingKey, bool isDurable)
         {
             return new InputChannel(channelName, _messageConsumerFactory.Create(channelName, routingKey, isDurable));

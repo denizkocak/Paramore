@@ -14,7 +14,7 @@ using TimeSpan = System.TimeSpan;
 
 namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
 {
-    public class SqsMessageConsumer : IAmAMessageConsumerSupportingDelay
+    public class SqsMessageConsumer : IAmAMessageConsumerSupportingDelay, IAmAMessageConsumerSupportingCache
     {
         private readonly ILog _logger;
         private readonly string _queueUrl;
@@ -24,47 +24,38 @@ namespace paramore.brighter.commandprocessor.messaginggateway.awssqs
             _logger = logger;
             _queueUrl = queueUrl;
             DelaySupported = true;
+            CacheSupported = true;
         }
 
         public bool DelaySupported { get; private set; }
 
+        public bool CacheSupported { get; private set; }
+
         public Message Receive(int timeoutInMilliseconds)
+        {
+            return Receive(timeoutInMilliseconds, 1);
+        }
+
+        public Message Receive(int timeoutInMilliseconds, int noOfMessagesToCache)
         {
             _logger.DebugFormat("SqsMessageConsumer: Preparing to retrieve next message from queue {0}", _queueUrl);
 
-            var message = new Message();
-            var request = new ReceiveMessageRequest(_queueUrl)
-                          {
-                              MaxNumberOfMessages = 1,
-                              WaitTimeSeconds = (int)TimeSpan.FromMilliseconds(timeoutInMilliseconds).TotalSeconds
-                          };
+            var rawSqsMessage = SqsQueuedRetriever.Instance.GetMessage(_queueUrl, timeoutInMilliseconds, noOfMessagesToCache).Result;
 
-            using (var client = new AmazonSQSClient())
-            {
-                var response = client.ReceiveMessage(request);
-                
-                if (response.HttpStatusCode != HttpStatusCode.OK) 
-                    return message;
+            if(rawSqsMessage == null)
+                return new Message();
 
-                if(response.ContentLength == 0)
-                    return message;
+            var sqsmessage = JsonConvert.DeserializeObject<SqsMessage>(rawSqsMessage.Body);
 
-                if(!response.Messages.Any())
-                    return message;
+            var contractResolver = new MessageDefaultContractResolver();
+            var settings = new JsonSerializerSettings { ContractResolver = contractResolver };
 
-                var rawSqsMessage = response.Messages.First();
-                var sqsmessage = JsonConvert.DeserializeObject<SqsMessage>(rawSqsMessage.Body);
+            var message = JsonConvert.DeserializeObject<Message>(sqsmessage.Message ?? rawSqsMessage.Body, settings);
 
-                var contractResolver = new MessageDefaultContractResolver();
-                var settings = new JsonSerializerSettings { ContractResolver = contractResolver };
+            message.Header.Bag.Add("ReceiptHandle", rawSqsMessage.ReceiptHandle);
 
-                message = JsonConvert.DeserializeObject<Message>(sqsmessage.Message ?? rawSqsMessage.Body, settings);
-
-                message.Header.Bag.Add("ReceiptHandle", rawSqsMessage.ReceiptHandle);
-                
-                _logger.InfoFormat("SqsMessageConsumer: Received message from queue {0}, message: {1}{2}",
-                        _queueUrl, Environment.NewLine, JsonConvert.SerializeObject(message));
-            }
+            _logger.InfoFormat("SqsMessageConsumer: Received message from queue {0}, message: {1}{2}",
+                    _queueUrl, Environment.NewLine, JsonConvert.SerializeObject(message));
 
             return message;
         }
