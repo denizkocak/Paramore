@@ -138,7 +138,7 @@ namespace paramore.brighter.commandprocessor.messaginggateway.rmq
                 Logger.DebugFormat("RmqMessageConsumer: Re-queueing message {0} with a delay of {1} milliseconds", message.Id, delayMilliseconds);
                 EnsureChannel(_queueName);
                 var rmqMessagePublisher = new RmqMessagePublisher(Channel, Configuration.Exchange.Name, Logger);
-                rmqMessagePublisher.PublishMessage(message, delayMilliseconds, regenerate: true);
+                rmqMessagePublisher.RequeueMessage(message, _queueName, delayMilliseconds);
                 Reject(message, false);
             }
             catch (Exception exception)
@@ -271,6 +271,8 @@ namespace paramore.brighter.commandprocessor.messaginggateway.rmq
             _consumer = new QueueingBasicConsumer(Channel);
 
             Channel.BasicConsume(_queueName, AutoAck, string.Empty, SetConsumerArguments(), _consumer);
+
+            _consumer.HandleBasicConsumeOk(string.Empty);
             
             Logger.InfoFormat("RmqMessageConsumer: Created consumer with ConsumerTag {4} for queue {0} with routing key {1} via exchange {2} on connection {3}",
                               _queueName,

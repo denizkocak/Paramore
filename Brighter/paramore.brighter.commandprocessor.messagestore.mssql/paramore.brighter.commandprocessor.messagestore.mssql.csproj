@@ -30,9 +30,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Newtonsoft.Json, Version=6.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Newtonsoft.Json.6.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+    <Reference Include="Newtonsoft.Json, Version=7.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -56,8 +56,15 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include="DDL Scripts\SQLCE\CreateMessageStore.sqlce" />
     <None Include="packages.config" />
     <None Include="paramore.brighter.commandprocessor.messagestore.mssql.nuspec" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="DDL Scripts\MSSQL\MessageStore.sql">
+      <SubType>Component</SubType>
+    </Content>
+    <Content Include="DDL Scripts\SQLite\MessageStore.sql" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
